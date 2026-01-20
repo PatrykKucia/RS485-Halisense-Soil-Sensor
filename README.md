@@ -16,3 +16,23 @@
 # Usefull info 
 - default baud rate 4800!!!
 
+# Usefull comands
+
+sudo pip3 install flask minimalmodbus pyserial --break-system-packages
+
+--break-system-packages - for pip install
+
+sudo apt install network-manager
+sudo systemctl enable NetworkManager
+sudo systemctl start NetworkManager
+
+
+[nmcli connection show] - schows all NetworkMenager hosts
+
+[sudo nmcli connection delete "Hotspot"]
+
+sudo nmcli device wifi hotspot ssid "MojMonitor" password "rolnik123" ifname wlan0
+
+sudo nmcli connection modify "MojMonitor" connection.autoconnect yes
+
+sudo nmcli connection modify "MojMonitor" connection.autoconnect-priority 100
