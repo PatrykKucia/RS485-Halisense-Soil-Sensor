@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor Gleby</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; }
+        canvas { margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #4CAF50; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h1>🌱 Monitor Gleby</h1>
+    
+    <canvas id="mainChart"></canvas>
+
+    <h2>Ostatnie Pomiary</h2>
+    <table id="dataTable">
+        <thead>
+            <tr>
+                <th>Czas</th>
+                <th>Wilgotność (%)</th>
+                <th>Temp (°C)</th>
+                <th>EC (uS/cm)</th>
+                <th>pH</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
+    </table>
+</div>
+
+<script>
+    async function fetchData() {
+        const response = await fetch('/api/data');
+        const data = await response.json();
+        updateChart(data);
+        updateTable(data);
+    }
+
+    function updateTable(data) {
+        const tbody = document.querySelector('#dataTable tbody');
+        tbody.innerHTML = '';
+        // Pokazujemy odwrócone (najnowsze na górze tabeli), więc bierzemy data.reverse() kopie
+        [...data].reverse().forEach(row => {
+            const tr = `<tr>
+                <td>${row.timestamp}</td>
+                <td>${row.hum}</td>
+                <td>${row.temp}</td>
+                <td>${row.ec}</td>
+                <td>${row.ph}</td>
+            </tr>`;
+            tbody.innerHTML += tr;
+        });
+    }
+
+    let myChart = null;
+
+    function updateChart(data) {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        
+        const labels = data.map(row => row.timestamp.split(' ')[1]); // Tylko godzina
+        const humData = data.map(row => row.hum);
+        const tempData = data.map(row => row.temp);
+        
+        if (myChart) {
+            myChart.destroy();
+        }
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Wilgotność %', data: humData, borderColor: 'blue', yAxisID: 'y' },
+                    { label: 'Temp °C', data: tempData, borderColor: 'red', yAxisID: 'y1' }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    y: { type: 'linear', display: true, position: 'left', title: {display: true, text: 'Wilgotność'} },
+                    y1: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Temperatura'}, grid: { drawOnChartArea: false } }
+                }
+            }
+        });
+    }
+
+    // Odświeżaj dane co 5 sekund
+    fetchData();
+    setInterval(fetchData, 5000);
+</script>
+
+</body>
+</html>
