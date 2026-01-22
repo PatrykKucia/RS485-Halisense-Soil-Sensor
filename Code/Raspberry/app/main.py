@@ -114,7 +114,7 @@ def oled_loop():
                     
                     # EKRAN 3: EC (Przewodność)
                     elif screen_index == 2:
-                        draw.text((0, 0), "EC (zasolenie):", fill="white")
+                        draw.text((0, 0), "EC:", fill="white")
                         draw.text((10, 15), f"{latest_data['ec']} uS/cm", fill="white")
                     
                     # EKRAN 4: pH
