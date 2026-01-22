@@ -91,12 +91,49 @@ def get_data():
     data = [dict(row) for row in rows]
     return jsonify(data[::-1])
 
-@app.route('/download_db')
-def download_db():
-    try:
-        return send_file(DB_NAME, as_attachment=True)
-    except Exception as e:
-        return str(f"Błąd: {e}")
+# --- PODMIEŃ TĘ FUNKCJĘ W main.py ---
+
+@app.route('/download_csv')
+def download_csv():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    c.execute("SELECT * FROM readings ORDER BY id DESC")
+    rows = c.fetchall()
+    conn.close()
+
+    si = io.StringIO()
+    # Używamy średnika jako separatora kolumn (standard w PL Excelu)
+    cw = csv.writer(si, delimiter=';') 
+    
+    cw.writerow(['ID', 'Data i Czas', 'Wilgotność (%)', 'Temperatura (C)', 'EC (uS/cm)', 'pH'])
+    
+    # Pętla przetwarzająca każdy wiersz przed zapisem
+    for row in rows:
+        # Baza zwraca "krotki" (tuple), których nie da się edytować. 
+        # Zamieniamy je na listę.
+        r = list(row)
+        
+        # Struktura danych: 0=id, 1=timestamp, 2=hum, 3=temp, 4=ec, 5=ph
+        
+        # Funkcja pomocnicza: zamień kropkę na przecinek, jeśli wartość istnieje
+        def to_pl_number(value):
+            if value is None:
+                return ""
+            return str(value).replace('.', ',')
+
+        # Podmieniamy wartości w kolumnach liczbowych
+        r[2] = to_pl_number(r[2]) # Wilgotność
+        r[3] = to_pl_number(r[3]) # Temp
+        r[4] = to_pl_number(r[4]) # EC
+        r[5] = to_pl_number(r[5]) # pH
+
+        cw.writerow(r)
+    
+    output = make_response(si.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=pomiary.csv"
+    output.headers["Content-type"] = "text/csv; charset=utf-8-sig" 
+    # Dodałem 'charset=utf-8-sig', żeby Excel poprawnie widział polskie znaki (jeśli byś ich użył w nagłówkach)
+    return output
 
 @app.route('/download_csv')
 def download_csv():
