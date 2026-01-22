@@ -5,32 +5,117 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitor Gleby</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: #333; }
-        canvas { margin-bottom: 30px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        body { font-family: sans-serif; padding: 10px; background: #f4f4f4; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; margin-bottom: 20px; }
+        
+        /* Styl dla siatki wykresów */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Dwie kolumny na komputerze */
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        /* Na telefonach (ekrany węższe niż 768px) zrób jedną kolumnę */
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr; 
+            }
+        }
+
+        .chart-box {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .chart-box h3 { text-align: center; margin: 0 0 10px 0; font-size: 16px; color: #555; }
+
+        /* Styl tabeli */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
         th { background-color: #4CAF50; color: white; }
         tr:nth-child(even) { background-color: #f2f2f2; }
+        
+        /* Przycisk pobierania */
+        .btn-download {
+            display: block; width: 100%; text-align: center; background: #008CBA; color: white; 
+            padding: 10px 0; text-decoration: none; border-radius: 5px; margin-bottom: 20px;
+        }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
+    
+    <script src="/static/chart.js"></script>
+    </head>
 <body>
 
 <div class="container">
     <h1>🌱 Monitor Gleby</h1>
     
-    <canvas id="mainChart"></canvas>
+    <style>
+        /* Style przycisków */
+        .btn-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap; /* Żeby na małym ekranie się ładnie układały */
+        }
+        .btn {
+            flex: 1;
+            text-align: center; 
+            color: white; 
+            padding: 12px 0; /* Trochę większe przyciski */
+            text-decoration: none; 
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 14px;
+            min-width: 150px; /* Minimalna szerokość */
+        }
+        .btn-db { background: #008CBA; }      /* Niebieski - Baza */
+        .btn-csv { background: #27ae60; }     /* Zielony - CSV */
+        .btn-reset { background: #c0392b; }   /* Czerwony - RESET */
+        
+        .btn:hover { opacity: 0.9; }          /* Efekt najechania myszką */
+    </style>
 
-    <h2>Ostatnie Pomiary</h2>
+    <div class="btn-container">
+        <a href="/download_db" class="btn btn-db">💾 Baza (.db)</a>
+        <a href="/download_csv" class="btn btn-csv">📊 Excel (.csv)</a>
+        
+        <a href="/reset_db" class="btn btn-reset" onclick="return confirm('UWAGA! \nCzy na pewno chcesz USUNĄĆ WSZYSTKIE POMIARY?\n\nTego procesu nie da się cofnąć!');">
+            🗑️ Wyczyść dane
+        </a>
+    </div>
+
+    <div class="charts-grid">
+        <div class="chart-box">
+            <h3>💧 Wilgotność (%)</h3>
+            <canvas id="humChart"></canvas>
+        </div>
+        <div class="chart-box">
+            <h3>🌡️ Temperatura (°C)</h3>
+            <canvas id="tempChart"></canvas>
+        </div>
+        <div class="chart-box">
+            <h3>⚡ EC (uS/cm)</h3>
+            <canvas id="ecChart"></canvas>
+        </div>
+        <div class="chart-box">
+            <h3>🧪 pH</h3>
+            <canvas id="phChart"></canvas>
+        </div>
+    </div>
+
+    <h2>📋 Ostatnie Pomiary</h2>
     <table id="dataTable">
         <thead>
             <tr>
                 <th>Czas</th>
-                <th>Wilgotność (%)</th>
-                <th>Temp (°C)</th>
-                <th>EC (uS/cm)</th>
+                <th>Wilgotność</th>
+                <th>Temp</th>
+                <th>EC</th>
                 <th>pH</th>
             </tr>
         </thead>
@@ -40,22 +125,35 @@
 </div>
 
 <script>
+    // Zmienne globalne na instancje wykresów
+    let chartInstances = {
+        hum: null,
+        temp: null,
+        ec: null,
+        ph: null
+    };
+
     async function fetchData() {
-        const response = await fetch('/api/data');
-        const data = await response.json();
-        updateChart(data);
-        updateTable(data);
+        try {
+            const response = await fetch('/api/data');
+            const data = await response.json();
+            updateCharts(data);
+            updateTable(data);
+        } catch (error) {
+            console.error("Błąd pobierania danych:", error);
+        }
     }
 
     function updateTable(data) {
         const tbody = document.querySelector('#dataTable tbody');
         tbody.innerHTML = '';
-        // Pokazujemy odwrócone (najnowsze na górze tabeli), więc bierzemy data.reverse() kopie
         [...data].reverse().forEach(row => {
+            // Skracamy czas do samej godziny dla czytelności w tabeli (opcjonalne)
+            const timeOnly = row.timestamp.split(' ')[1]; 
             const tr = `<tr>
-                <td>${row.timestamp}</td>
-                <td>${row.hum}</td>
-                <td>${row.temp}</td>
+                <td>${timeOnly}</td>
+                <td>${row.hum}%</td>
+                <td>${row.temp}°C</td>
                 <td>${row.ec}</td>
                 <td>${row.ph}</td>
             </tr>`;
@@ -63,40 +161,57 @@
         });
     }
 
-    let myChart = null;
-
-    function updateChart(data) {
-        const ctx = document.getElementById('mainChart').getContext('2d');
+    function createChart(ctxId, label, data, labels, color, chartKey) {
+        const ctx = document.getElementById(ctxId).getContext('2d');
         
-        const labels = data.map(row => row.timestamp.split(' ')[1]); // Tylko godzina
-        const humData = data.map(row => row.hum);
-        const tempData = data.map(row => row.temp);
-        
-        if (myChart) {
-            myChart.destroy();
+        // Jeśli wykres już istnieje, zniszcz go przed narysowaniem nowego
+        if (chartInstances[chartKey]) {
+            chartInstances[chartKey].destroy();
         }
 
-        myChart = new Chart(ctx, {
+        chartInstances[chartKey] = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
-                datasets: [
-                    { label: 'Wilgotność %', data: humData, borderColor: 'blue', yAxisID: 'y' },
-                    { label: 'Temp °C', data: tempData, borderColor: 'red', yAxisID: 'y1' }
-                ]
+                datasets: [{
+                    label: label,
+                    data: data,
+                    borderColor: color,
+                    backgroundColor: color + '33', // Przezroczyste tło (hex code + opacity)
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    fill: true
+                }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false, // Ważne dla CSS Grid
                 interaction: { mode: 'index', intersect: false },
                 scales: {
-                    y: { type: 'linear', display: true, position: 'left', title: {display: true, text: 'Wilgotność'} },
-                    y1: { type: 'linear', display: true, position: 'right', title: {display: true, text: 'Temperatura'}, grid: { drawOnChartArea: false } }
-                }
+                    x: { display: true, ticks: { maxTicksLimit: 5 } }, // Ogranicz liczbę etykiet na osi X
+                    y: { beginAtZero: false }
+                },
+                plugins: { legend: { display: false } } // Ukrywamy legendę bo jest nagłówek
             }
         });
     }
 
-    // Odświeżaj dane co 5 sekund
+    function updateCharts(data) {
+        // Przygotowanie danych
+        const labels = data.map(row => row.timestamp.split(' ')[1]); // Tylko godzina
+        const humData = data.map(row => row.hum);
+        const tempData = data.map(row => row.temp);
+        const ecData = data.map(row => row.ec);
+        const phData = data.map(row => row.ph);
+
+        // Rysowanie 4 wykresów
+        createChart('humChart', 'Wilgotność %', humData, labels, '#3498db', 'hum'); // Niebieski
+        createChart('tempChart', 'Temp °C', tempData, labels, '#e74c3c', 'temp');   // Czerwony
+        createChart('ecChart', 'EC uS/cm', ecData, labels, '#f1c40f', 'ec');        // Żółty/Pomarańczowy
+        createChart('phChart', 'pH', phData, labels, '#2ecc71', 'ph');              // Zielony
+    }
+
+    // Odświeżanie co 5 sekund
     fetchData();
     setInterval(fetchData, 5000);
 </script>
