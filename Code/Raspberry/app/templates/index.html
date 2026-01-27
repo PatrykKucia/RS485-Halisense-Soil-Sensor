@@ -9,132 +9,98 @@
         .container { max-width: 900px; margin: 0 auto; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         h1 { text-align: center; color: #333; margin-bottom: 20px; }
         
-        /* Styl dla siatki wykresów */
         .charts-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr; /* Dwie kolumny na komputerze */
+            grid-template-columns: 1fr 1fr;
             gap: 20px;
             margin-bottom: 30px;
         }
+        @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
 
-        /* Na telefonach jedna kolumna */
-        @media (max-width: 768px) {
-            .charts-grid {
-                grid-template-columns: 1fr; 
-            }
-        }
-
-        .chart-box {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-        
-        /* --- POPRAWKA WYKRESÓW --- */
-        /* To jest kluczowe - kontener musi mieć sztywną wysokość */
-        .chart-container {
-            position: relative;
-            height: 250px; /* Ustalamy wysokość na sztywno */
-            width: 100%;
-        }
-
+        .chart-box { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .chart-container { position: relative; height: 250px; width: 100%; }
         .chart-box h3 { text-align: center; margin: 0 0 10px 0; font-size: 16px; color: #555; }
 
-        /* Styl tabeli */
         table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
         th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
         th { background-color: #4CAF50; color: white; }
         tr:nth-child(even) { background-color: #f2f2f2; }
         
         /* Style przycisków */
-        .btn-container {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap; 
-        }
+        .btn-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
         .btn {
-            flex: 1;
-            text-align: center; 
-            color: white; 
-            padding: 12px 0; 
-            text-decoration: none; 
-            border-radius: 5px;
-            font-weight: bold;
-            font-size: 14px;
-            min-width: 150px;
+            flex: 1; text-align: center; color: white; padding: 12px 0; 
+            text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; min-width: 140px; cursor: pointer; border: none;
         }
         .btn-db { background: #008CBA; }      
         .btn-csv { background: #27ae60; }     
-        .btn-reset { background: #c0392b; }   
+        .btn-reset { background: #c0392b; }
+        .btn-time { background: #f39c12; } /* Żółty */
         
         .btn:hover { opacity: 0.9; }          
     </style>
-    
     <script src="/static/chart.js"></script>
-    </head>
+</head>
 <body>
 
 <div class="container">
     <h1>🌱 Monitor Gleby</h1>
     
     <div class="btn-container">
+        <button onclick="syncTime()" class="btn btn-time">🕒 Ustaw Czas z Telefonu</button>
+        
         <a href="/download_db" class="btn btn-db">💾 Baza (.db)</a>
         <a href="/download_csv" class="btn btn-csv">📊 Excel (.csv)</a>
-        <a href="/reset_db" class="btn btn-reset" onclick="return confirm('UWAGA! \nCzy na pewno chcesz USUNĄĆ WSZYSTKIE POMIARY?\n\nTego procesu nie da się cofnąć!');">
-            🗑️ Wyczyść dane
-        </a>
+        <a href="/reset_db" class="btn btn-reset" onclick="return confirm('Czy na pewno USUNĄĆ WSZYSTKIE DANE?');">🗑️ Wyczyść</a>
     </div>
 
     <div class="charts-grid">
-        <div class="chart-box">
-            <h3>💧 Wilgotność (%)</h3>
-            <div class="chart-container">
-                <canvas id="humChart"></canvas>
-            </div>
-        </div>
-        <div class="chart-box">
-            <h3>🌡️ Temperatura (°C)</h3>
-            <div class="chart-container">
-                <canvas id="tempChart"></canvas>
-            </div>
-        </div>
-        <div class="chart-box">
-            <h3>⚡ EC (uS/cm)</h3>
-            <div class="chart-container">
-                <canvas id="ecChart"></canvas>
-            </div>
-        </div>
-        <div class="chart-box">
-            <h3>🧪 pH</h3>
-            <div class="chart-container">
-                <canvas id="phChart"></canvas>
-            </div>
-        </div>
+        <div class="chart-box"><h3>💧 Wilgotność (%)</h3><div class="chart-container"><canvas id="humChart"></canvas></div></div>
+        <div class="chart-box"><h3>🌡️ Temperatura (°C)</h3><div class="chart-container"><canvas id="tempChart"></canvas></div></div>
+        <div class="chart-box"><h3>⚡ EC (uS/cm)</h3><div class="chart-container"><canvas id="ecChart"></canvas></div></div>
+        <div class="chart-box"><h3>🧪 pH</h3><div class="chart-container"><canvas id="phChart"></canvas></div></div>
     </div>
 
     <h2>📋 Ostatnie Pomiary</h2>
     <table id="dataTable">
-        <thead>
-            <tr>
-                <th>Czas</th>
-                <th>Wilgotność</th>
-                <th>Temp</th>
-                <th>EC</th>
-                <th>pH</th>
-            </tr>
-        </thead>
-        <tbody>
-            </tbody>
+        <thead><tr><th>Czas</th><th>Wilgotność</th><th>Temp</th><th>EC</th><th>pH</th></tr></thead>
+        <tbody></tbody>
     </table>
 </div>
 
 <script>
-    let chartInstances = {
-        hum: null, temp: null, ec: null, ph: null
-    };
+    // --- FUNKCJA SYNCHRONIZACJI CZASU ---
+    async function syncTime() {
+        const now = new Date();
+        // Formatujemy datę do stringa: YYYY-MM-DD HH:MM:SS
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        
+        const timeStr = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        
+        if(confirm(`Czy ustawić czas urządzenia na:\n${timeStr}?`)) {
+            try {
+                const response = await fetch('/set_time', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ time: timeStr })
+                });
+                const result = await response.json();
+                alert("Sukces! " + result.message);
+                // Odśwież stronę żeby zobaczyć nową datę w tabeli (jak wpadnie nowy pomiar)
+                setTimeout(() => location.reload(), 1000); 
+            } catch (error) {
+                alert("Błąd: " + error);
+            }
+        }
+    }
+
+    // --- RESZTA KODU (WYKRESY) ---
+    let chartInstances = { hum: null, temp: null, ec: null, ph: null };
 
     async function fetchData() {
         try {
@@ -142,9 +108,7 @@
             const data = await response.json();
             updateCharts(data);
             updateTable(data);
-        } catch (error) {
-            console.error("Błąd pobierania danych:", error);
-        }
+        } catch (error) { console.error(error); }
     }
 
     function updateTable(data) {
@@ -152,47 +116,23 @@
         tbody.innerHTML = '';
         [...data].reverse().forEach(row => {
             const timeOnly = row.timestamp.split(' ')[1]; 
-            const tr = `<tr>
-                <td>${timeOnly}</td>
-                <td>${row.hum}%</td>
-                <td>${row.temp}°C</td>
-                <td>${row.ec}</td>
-                <td>${row.ph}</td>
-            </tr>`;
+            const tr = `<tr><td>${timeOnly}</td><td>${row.hum}%</td><td>${row.temp}°C</td><td>${row.ec}</td><td>${row.ph}</td></tr>`;
             tbody.innerHTML += tr;
         });
     }
 
     function createChart(ctxId, label, data, labels, color, chartKey) {
         const ctx = document.getElementById(ctxId).getContext('2d');
-        
-        if (chartInstances[chartKey]) {
-            chartInstances[chartKey].destroy();
-        }
-
+        if (chartInstances[chartKey]) chartInstances[chartKey].destroy();
         chartInstances[chartKey] = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
-                datasets: [{
-                    label: label,
-                    data: data,
-                    borderColor: color,
-                    backgroundColor: color + '33', 
-                    borderWidth: 2,
-                    pointRadius: 2,
-                    fill: true,
-                    tension: 0 // Lekkie wygładzenie linii
-                }]
+                datasets: [{ label: label, data: data, borderColor: color, backgroundColor: color + '33', borderWidth: 2, pointRadius: 2, fill: true, tension: 0 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false, // Teraz to zadziała bo mamy .chart-container
-                interaction: { mode: 'index', intersect: false },
-                scales: {
-                    x: { display: true, ticks: { maxTicksLimit: 6 } }, 
-                    y: { beginAtZero: false }
-                },
+                responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                scales: { x: { display: true, ticks: { maxTicksLimit: 6 } }, y: { beginAtZero: false } },
                 plugins: { legend: { display: false } } 
             }
         });
@@ -200,15 +140,10 @@
 
     function updateCharts(data) {
         const labels = data.map(row => row.timestamp.split(' ')[1]); 
-        const humData = data.map(row => row.hum);
-        const tempData = data.map(row => row.temp);
-        const ecData = data.map(row => row.ec);
-        const phData = data.map(row => row.ph);
-
-        createChart('humChart', 'Wilgotność %', humData, labels, '#3498db', 'hum'); 
-        createChart('tempChart', 'Temp °C', tempData, labels, '#e74c3c', 'temp');   
-        createChart('ecChart', 'EC uS/cm', ecData, labels, '#f1c40f', 'ec');        
-        createChart('phChart', 'pH', phData, labels, '#2ecc71', 'ph');              
+        createChart('humChart', 'Wilgotność %', data.map(r => r.hum), labels, '#3498db', 'hum'); 
+        createChart('tempChart', 'Temp °C', data.map(r => r.temp), labels, '#e74c3c', 'temp');   
+        createChart('ecChart', 'EC uS/cm', data.map(r => r.ec), labels, '#f1c40f', 'ec');        
+        createChart('phChart', 'pH', data.map(r => r.ph), labels, '#2ecc71', 'ph');              
     }
 
     fetchData();
