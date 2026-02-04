@@ -4,8 +4,8 @@ import threading
 import datetime
 import csv
 import io
-import subprocess  # <--- NOWOŚĆ: Do zmiany czasu systemowego
-from flask import Flask, render_template, jsonify, send_file, make_response, redirect, url_for, request # <--- NOWOŚĆ: request
+import subprocess
+from flask import Flask, render_template, jsonify, send_file, make_response, redirect, url_for, request
 import minimalmodbus
 import serial
 
@@ -21,7 +21,10 @@ SLAVE_ADDRESS = 1
 BAUDRATE = 4800
 DB_NAME = 'soil_data.db'
 
-# Globalne dane
+# --- ZMIENNE GLOBALNE ---
+# Domyślny czas między pomiarami (w sekundach) - startujemy od 10s
+MEASUREMENT_INTERVAL = 10 
+
 latest_data = {
     'hum': None, 'temp': None, 'ec': None, 'ph': None, 'timestamp': "Brak danych"
 }
@@ -57,7 +60,6 @@ def setup_sensor():
 def setup_oled():
     try:
         serial_i2c = i2c(port=1, address=0x3C)
-        # Pamiętaj o ustawieniach swojego ekranu (height=32/64)
         device = ssd1306(serial_i2c, width=128, height=32, rotate=0)
         return device
     except Exception as e:
@@ -84,7 +86,7 @@ def oled_loop():
                         draw.text((0, 0), "TEMPERATURA:", fill="white")
                         draw.text((10, 15), f"{latest_data['temp']} C", fill="white")
                     elif screen_index == 2:
-                        draw.text((0, 0), "EC (zasolenie):", fill="white")
+                        draw.text((0, 0), "EC:", fill="white")
                         draw.text((10, 15), f"{latest_data['ec']} uS/cm", fill="white")
                     elif screen_index == 3:
                         draw.text((0, 0), "pH GLEBY:", fill="white")
@@ -94,10 +96,13 @@ def oled_loop():
             time.sleep(1)
 
 def sensor_loop():
+    global MEASUREMENT_INTERVAL
     sensor = setup_sensor()
     if not sensor: return
+    
     while True:
         try:
+            # 1. POBIERANIE DANYCH
             hum = sensor.read_register(0, 1, 3)
             temp = sensor.read_register(1, 1, 3)
             ec = sensor.read_register(2, 0, 3)
@@ -105,7 +110,7 @@ def sensor_loop():
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
             latest_data.update({'hum': hum, 'temp': temp, 'ec': ec, 'ph': ph, 'timestamp': timestamp})
-            print(f"Zapis: {timestamp} | H:{hum}% T:{temp}C EC:{ec} pH:{ph}")
+            print(f"Zapis: {timestamp} | H:{hum}% T:{temp}C EC:{ec} pH:{ph} | Interwał: {MEASUREMENT_INTERVAL}s")
 
             conn = sqlite3.connect(DB_NAME)
             c = conn.cursor()
@@ -115,7 +120,13 @@ def sensor_loop():
             conn.close()
         except Exception as e:
             print(f"Błąd odczytu: {e}")
-        time.sleep(10)
+        
+        # 2. INTELIGENTNE CZEKANIE (Smart Sleep)
+        # Zamiast time.sleep(MEASUREMENT_INTERVAL), który zablokowałby wątek na np. godzinę,
+        # sprawdzamy co 0.5 sekundy, czy czas minął. Dzięki temu zmiana interwału działa natychmiast.
+        start_wait = time.time()
+        while (time.time() - start_wait) < MEASUREMENT_INTERVAL:
+            time.sleep(0.5)
 
 # --- FLASK ---
 
@@ -132,6 +143,24 @@ def get_data():
     rows = c.fetchall()
     conn.close()
     return jsonify([dict(row) for row in rows][::-1])
+
+# Nowy endpoint do pobierania aktualnych ustawień (żeby dropdown wiedział co pokazać)
+@app.route('/get_settings')
+def get_settings():
+    return jsonify({"interval": MEASUREMENT_INTERVAL})
+
+# Nowy endpoint do ustawiania interwału
+@app.route('/set_interval', methods=['POST'])
+def set_interval():
+    global MEASUREMENT_INTERVAL
+    try:
+        data = request.json
+        new_interval = int(data.get('interval'))
+        MEASUREMENT_INTERVAL = new_interval
+        print(f"Zmieniono interwał pomiarowy na: {MEASUREMENT_INTERVAL} sekund")
+        return jsonify({"status": "success", "new_interval": MEASUREMENT_INTERVAL})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
 
 @app.route('/download_db')
 def download_db():
@@ -171,23 +200,18 @@ def reset_db():
         return redirect(url_for('index'))
     except Exception as e: return str(e)
 
-# --- NOWOŚĆ: Synchronizacja czasu ---
 @app.route('/set_time', methods=['POST'])
 def set_time():
     try:
-        # Pobieramy datę wysłaną z telefonu (format: YYYY-MM-DD HH:MM:SS)
         data = request.json
         new_time = data.get('time')
-        
         if new_time:
-            print(f"Ustawiam czas systemowy na: {new_time}")
-            # Wywołujemy komendę systemową Linuxa
+            print(f"Ustawiam czas na: {new_time}")
             subprocess.run(["date", "-s", new_time], check=True)
             return jsonify({"status": "success", "message": f"Czas ustawiony na {new_time}"})
         else:
             return jsonify({"status": "error", "message": "Brak danych"}), 400
     except Exception as e:
-        print(f"Błąd zmiany czasu: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
