@@ -27,15 +27,35 @@
         tr:nth-child(even) { background-color: #f2f2f2; }
         
         /* Style przycisków */
-        .btn-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .controls-row {
+            display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; 
+            align-items: center; justify-content: space-between;
+            background: #eee; padding: 10px; border-radius: 8px;
+        }
+        /* Zwiększyłem odstęp na dole do 40px */
+        .btn-container { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 40px; /* <--- TU ZMIANA (Było 20px) */
+            flex-wrap: wrap; 
+            flex: 1; 
+        }
         .btn {
-            flex: 1; text-align: center; color: white; padding: 12px 0; 
-            text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; min-width: 140px; cursor: pointer; border: none;
+            text-align: center; color: white; padding: 10px 15px; 
+            text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; 
+            cursor: pointer; border: none; flex: 1; min-width: 120px;
         }
         .btn-db { background: #008CBA; }      
         .btn-csv { background: #27ae60; }     
         .btn-reset { background: #c0392b; }
-        .btn-time { background: #f39c12; } /* Żółty */
+        .btn-time { background: #f39c12; } 
+        .btn-save { background: #8e44ad; max-width: 100px;} /* Fioletowy */
+        
+        .settings-box {
+            display: flex; align-items: center; gap: 10px;
+            background: white; padding: 5px 10px; border-radius: 5px; border: 1px solid #ddd;
+        }
+        select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; }
         
         .btn:hover { opacity: 0.9; }          
     </style>
@@ -46,9 +66,24 @@
 <div class="container">
     <h1>🌱 Monitor Gleby</h1>
     
+    <div class="controls-row">
+        <div class="settings-box">
+            <span>⏱️ Co ile mierzyć:</span>
+            <select id="intervalSelect">
+                <option value="1">1 sekunda</option>
+                <option value="10">10 sekund</option>
+                <option value="30">30 sekund</option>
+                <option value="60">1 minuta</option>
+                <option value="600">10 minut</option>
+                <option value="3600">1 godzina</option>
+            </select>
+            <button onclick="setIntervalTime()" class="btn btn-save">Zapisz</button>
+        </div>
+
+        <button onclick="syncTime()" class="btn btn-time">🕒 Ustaw Czas</button>
+    </div>
+
     <div class="btn-container">
-        <button onclick="syncTime()" class="btn btn-time">🕒 Ustaw Czas z Telefonu</button>
-        
         <a href="/download_db" class="btn btn-db">💾 Baza (.db)</a>
         <a href="/download_csv" class="btn btn-csv">📊 Excel (.csv)</a>
         <a href="/reset_db" class="btn btn-reset" onclick="return confirm('Czy na pewno USUNĄĆ WSZYSTKIE DANE?');">🗑️ Wyczyść</a>
@@ -69,17 +104,38 @@
 </div>
 
 <script>
+    // --- FUNKCJA ZMIANY INTERWAŁU ---
+    async function setIntervalTime() {
+        const val = document.getElementById('intervalSelect').value;
+        try {
+            const response = await fetch('/set_interval', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ interval: val })
+            });
+            const result = await response.json();
+            alert("Zmieniono częstotliwość na: " + val + "s");
+        } catch (e) { alert("Błąd: " + e); }
+    }
+
+    // Pobierz aktualne ustawienie przy starcie
+    async function loadSettings() {
+        try {
+            const response = await fetch('/get_settings');
+            const data = await response.json();
+            document.getElementById('intervalSelect').value = data.interval;
+        } catch(e) { console.log(e); }
+    }
+
     // --- FUNKCJA SYNCHRONIZACJI CZASU ---
     async function syncTime() {
         const now = new Date();
-        // Formatujemy datę do stringa: YYYY-MM-DD HH:MM:SS
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const seconds = String(now.getSeconds()).padStart(2, '0');
-        
         const timeStr = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
         
         if(confirm(`Czy ustawić czas urządzenia na:\n${timeStr}?`)) {
@@ -91,15 +147,12 @@
                 });
                 const result = await response.json();
                 alert("Sukces! " + result.message);
-                // Odśwież stronę żeby zobaczyć nową datę w tabeli (jak wpadnie nowy pomiar)
                 setTimeout(() => location.reload(), 1000); 
-            } catch (error) {
-                alert("Błąd: " + error);
-            }
+            } catch (error) { alert("Błąd: " + error); }
         }
     }
 
-    // --- RESZTA KODU (WYKRESY) ---
+    // --- WYKRESY ---
     let chartInstances = { hum: null, temp: null, ec: null, ph: null };
 
     async function fetchData() {
@@ -146,6 +199,7 @@
         createChart('phChart', 'pH', data.map(r => r.ph), labels, '#2ecc71', 'ph');              
     }
 
+    loadSettings(); // Wczytaj interwał przy starcie
     fetchData();
     setInterval(fetchData, 5000);
 </script>
